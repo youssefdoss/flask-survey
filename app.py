@@ -8,14 +8,13 @@ app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 
 debug = DebugToolbarExtension(app)
 
-responses = []
-
 
 @app.get('/')
 def show_home_page():
     '''Brings the user to the home page with a start button'''
 
     return render_template(
+        # You can just inject the entire survey and specify properties in the HTML
         'survey_start.html',
         title=survey.title,
         instructions=survey.instructions)
@@ -24,6 +23,7 @@ def show_home_page():
 @app.post('/begin')
 def start_survey():
     '''Redirects user to first survey question page'''
+    session['responses'] = []
 
     return redirect('/questions/0')
 
@@ -31,12 +31,21 @@ def start_survey():
 @app.get('/questions/<question_number>')
 def show_first_question(question_number):
     '''Brings the user to the first survey question page'''
-    question_number = len(responses)
+    correct_question_number = len(session['responses'])
 
-    return render_template(
-        'question.html',
-        prompt=survey.questions[question_number].prompt,
-        choices=survey.questions[question_number].choices)
+    if correct_question_number == len(survey.questions):
+
+        flash("Hey dummy that question is invalid")
+        return redirect('/thank_you')
+    elif correct_question_number == int(question_number):
+        
+        return render_template(
+            'question.html',
+            prompt=survey.questions[correct_question_number].prompt,
+            choices=survey.questions[correct_question_number].choices)
+    else:
+        flash("Why can't you just follow instructions you absolute monster")
+        return redirect(f'/questions/{correct_question_number}')
 
 
 @app.post('/answer')
@@ -44,10 +53,12 @@ def handle_answer():
     '''Adds answer to responses list and redirects to next question,
     or sends the user to the thank you page'''
 
+    responses = session['responses']
     responses.append(request.form['answer'])
+    session['responses'] = responses
 
-    if len(responses) < len(survey.questions):
-        return redirect(f'/questions/{len(responses)}')
+    if len(session['responses']) < len(survey.questions):
+        return redirect(f'/questions/{len(session["responses"])}')
 
     else:
         return redirect('/thank_you')
@@ -61,4 +72,5 @@ def show_completed_page():
     return render_template(
         'completion.html',
         questions=questions,
-        responses=responses)
+        # You can get session and cookie values directly in the Jinja template
+        responses=session['responses'])
